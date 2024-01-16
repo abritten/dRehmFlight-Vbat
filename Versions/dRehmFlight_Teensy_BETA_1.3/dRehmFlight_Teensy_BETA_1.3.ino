@@ -1,7 +1,9 @@
 //Arduino/Teensy Flight Controller - dRehmFlight
 //Author: Nicholas Rehm
-//Project Start: 1/6/2020
-//Last Updated: 7/29/2022
+//Editor: Drew Britten
+//Project: Vbat build
+//Project Start: 01/01/2024
+//Last Updated: 01/14/2024
 //Version: Beta 1.3
 
 //========================================================================================================================//
@@ -22,6 +24,10 @@
   RcGroups 'jihlein' - IMU implementation overhaul + SBUS implementation.
   Everyone that sends me pictures and videos of your flying creations! -Nick
 
+  Thank you to:
+  Nick Rehm for the help and support on RCGroups VTOL blog to tune this model.
+  Steve Morris for making and sharing public Youtube content on aviation and drone technology prototypes. -Drew
+
 */
 
 
@@ -31,9 +37,9 @@
 //========================================================================================================================//
 
 //Uncomment only one receiver type
-#define USE_PWM_RX
+//#define USE_PWM_RX
 //#define USE_PPM_RX
-//#define USE_SBUS_RX
+#define USE_SBUS_RX
 //#define USE_DSM_RX
 static const uint8_t num_DSM_channels = 6; //If using DSM RX, change this to match the number of transmitter channels you have
 
@@ -150,8 +156,8 @@ unsigned long channel_1_fs = 1000; //thro
 unsigned long channel_2_fs = 1500; //ail
 unsigned long channel_3_fs = 1500; //elev
 unsigned long channel_4_fs = 1500; //rudd
-unsigned long channel_5_fs = 2000; //gear, greater than 1500 = throttle cut
-unsigned long channel_6_fs = 2000; //aux1
+unsigned long channel_5_fs = 1000; //gear, greater than 1500 = throttle cut
+unsigned long channel_6_fs = 1500; //aux1
 
 //Filter parameters - Defaults tuned for 2kHz loop rate; Do not touch unless you know what you are doing:
 float B_madgwick = 0.04;  //Madgwick filter parameter
@@ -167,25 +173,31 @@ float MagScaleX = 1.0;
 float MagScaleY = 1.0;
 float MagScaleZ = 1.0;
 
+
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 //IMU calibration parameters - calibrate IMU using calculate_IMU_error() in the void setup() to get these values, then comment out calculate_IMU_error()
-float AccErrorX = 0.0;
-float AccErrorY = 0.0;
-float AccErrorZ = 0.0;
-float GyroErrorX = 0.0;
-float GyroErrorY = 0.0;
-float GyroErrorZ = 0.0;
+float AccErrorX = 0.14;
+float AccErrorY = 0.01;
+float AccErrorZ = -0.07;
+float GyroErrorX = -3.58;
+float GyroErrorY = -0.13;
+float GyroErrorZ = -1.78;
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
 
 //Controller parameters (take note of defaults before modifying!):
 float i_limit = 25.0;     //Integrator saturation level, mostly for safety (default 25.0)
-float maxRoll = 30.0;     //Max roll angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
-float maxPitch = 30.0;    //Max pitch angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
+float maxRoll = 10.0;     //Max roll angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
+float maxPitch = 10.0;    //Max pitch angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
 float maxYaw = 160.0;     //Max yaw rate in deg/sec
 
-float Kp_roll_angle = 0.2;    //Roll P-gain - angle mode
+//ROLL
+float Kp_roll_angle = 0.9;    //Roll P-gain - angle mode
 float Ki_roll_angle = 0.3;    //Roll I-gain - angle mode
 float Kd_roll_angle = 0.05;   //Roll D-gain - angle mode (has no effect on controlANGLE2)
 float B_loop_roll = 0.9;      //Roll damping term for controlANGLE2(), lower is more damping (must be between 0 to 1)
-float Kp_pitch_angle = 0.2;   //Pitch P-gain - angle mode
+//PITCH
+float Kp_pitch_angle = 0.9;   //Pitch P-gain - angle mode
 float Ki_pitch_angle = 0.3;   //Pitch I-gain - angle mode
 float Kd_pitch_angle = 0.05;  //Pitch D-gain - angle mode (has no effect on controlANGLE2)
 float B_loop_pitch = 0.9;     //Pitch damping term for controlANGLE2(), lower is more damping (must be between 0 to 1)
@@ -196,7 +208,7 @@ float Kd_roll_rate = 0.0002;  //Roll D-gain - rate mode (be careful when increas
 float Kp_pitch_rate = 0.15;   //Pitch P-gain - rate mode
 float Ki_pitch_rate = 0.2;    //Pitch I-gain - rate mode
 float Kd_pitch_rate = 0.0002; //Pitch D-gain - rate mode (be careful when increasing too high, motors will begin to overheat!)
-
+//YAW
 float Kp_yaw = 0.3;           //Yaw P-gain
 float Ki_yaw = 0.05;          //Yaw I-gain
 float Kd_yaw = 0.00015;       //Yaw D-gain (be careful when increasing too high, motors will begin to overheat!)
@@ -218,20 +230,20 @@ const int ch5Pin = 21; //gear (throttle cut)
 const int ch6Pin = 22; //aux1 (free aux channel)
 const int PPM_Pin = 23;
 //OneShot125 ESC pin outputs:
-const int m1Pin = 0;
+const int m1Pin = 0;//main motor
 const int m2Pin = 1;
 const int m3Pin = 2;
 const int m4Pin = 3;
 const int m5Pin = 4;
 const int m6Pin = 5;
 //PWM servo or ESC outputs:
-const int servo1Pin = 6;
-const int servo2Pin = 7;
-const int servo3Pin = 8;
-const int servo4Pin = 9;
-const int servo5Pin = 10;
-const int servo6Pin = 11;
-const int servo7Pin = 12;
+const int servo1Pin = 6;//RUDDER1
+const int servo2Pin = 7;//RUDDER2
+const int servo3Pin = 8;//ELEVATOR1
+const int servo4Pin = 9;//ELEVATOR2
+const int servo5Pin = 10;//AILERON1 PORT
+const int servo6Pin = 11;//AILERON2 STBD
+const int servo7Pin = 12;//CAMERA1 Tilt
 PWMServo servo1;  //Create servo objects to control a servo or ESC with PWM
 PWMServo servo2;
 PWMServo servo3;
@@ -298,6 +310,18 @@ int m1_command_PWM, m2_command_PWM, m3_command_PWM, m4_command_PWM, m5_command_P
 float s1_command_scaled, s2_command_scaled, s3_command_scaled, s4_command_scaled, s5_command_scaled, s6_command_scaled, s7_command_scaled;
 int s1_command_PWM, s2_command_PWM, s3_command_PWM, s4_command_PWM, s5_command_PWM, s6_command_PWM, s7_command_PWM;
 
+
+//Servo centered positions
+float RUDDER1 = 0.5;
+float RUDDER2 = 0.5;
+float ELEVATOR1 = 0.5;
+float ELEVATOR2 = 0.5;
+float AILERON1 = 0.5;
+float AILERON2 = 0.5;
+float CAMERA1 = 0.5;
+
+
+
 //Flight status
 bool armedFly = false;
 
@@ -350,16 +374,16 @@ void setup() {
   //calculate_IMU_error(); //Calibration parameters printed to serial monitor. Paste these in the user specified variables section, then comment this out forever.
 
   //Arm servo channels
-  servo1.write(0); //Command servo angle from 0-180 degrees (1000 to 2000 PWM)
-  servo2.write(0); //Set these to 90 for servos if you do not want them to briefly max out on startup
-  servo3.write(0); //Keep these at 0 if you are using servo outputs for motors
-  servo4.write(0);
-  servo5.write(0);
-  servo6.write(0);
-  servo7.write(0);
+  servo1.write(90); //Command servo angle from 0-180 degrees (1000 to 2000 PWM)
+  servo2.write(90); //Set these to 90 for servos if you do not want them to briefly max out on startup
+  servo3.write(90); //Keep these at 0 if you are using servo outputs for motors
+  servo4.write(90);
+  servo5.write(90);
+  servo6.write(90);
+  servo7.write(90);
 
   delay(5);
-
+  //delay(500000000);
   //calibrateESCs(); //PROPS OFF. Uncomment this to calibrate your ESCs by setting throttle stick to max, powering on, and lowering throttle to zero after the beeps
   //Code will not proceed past here if this function is uncommented!
 
@@ -403,32 +427,19 @@ void loop() {
   //printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
   //printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
   //printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
-  //printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
+  printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
   //printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
 
-  // Get arming status
   armedStatus(); //Check if the throttle cut is off and throttle is low.
-
-  //Get vehicle state
   getIMUdata(); //Pulls raw gyro, accelerometer, and magnetometer data from IMU and LP filters to remove noise
   Madgwick(GyroX, -GyroY, -GyroZ, -AccX, AccY, AccZ, MagY, -MagX, MagZ, dt); //Updates roll_IMU, pitch_IMU, and yaw_IMU angle estimates (degrees)
-
-  //Compute desired state
   getDesState(); //Convert raw commands to normalized values based on saturated control limits
-
-  //PID Controller - SELECT ONE:
   controlANGLE(); //Stabilize on angle setpoint
   //controlANGLE2(); //Stabilize on angle setpoint using cascaded method. Rate controller must be tuned well first!
   //controlRATE(); //Stabilize on rate setpoint
-
-  //Actuator mixing and scaling to PWM values
   controlMixer(); //Mixes PID outputs to scaled actuator commands -- custom mixing assignments done here
   scaleCommands(); //Scales motor commands to 125 to 250 range (oneshot125 protocol) and servo PWM commands to 0 to 180 (for servo library)
-
-  //Throttle cut check
   throttleCut(); //Directly sets motor commands to low based on state of ch5
-
-  //Command actuators
   commandMotors(); //Sends command pulses to each motor pin using OneShot125 protocol
   servo1.write(s1_command_PWM); //Writes PWM value to servo object
   servo2.write(s2_command_PWM);
@@ -437,12 +448,8 @@ void loop() {
   servo5.write(s5_command_PWM);
   servo6.write(s6_command_PWM);
   servo7.write(s7_command_PWM);
-
-  //Get vehicle commands for next loop iteration
   getCommands(); //Pulls current available radio commands
   failSafe(); //Prevent failures in event of bad receiver connection, defaults to failsafe values assigned in setup
-
-  //Regulate loop rate
   loopRate(2000); //Do not exceed 2000Hz, all filter parameters tuned to 2000Hz by default
 }
 
@@ -472,27 +479,27 @@ void controlMixer() {
   */
 
   //Quad mixing - EXAMPLE
-  m1_command_scaled = thro_des - pitch_PID + roll_PID + yaw_PID; //Front Left
-  m2_command_scaled = thro_des - pitch_PID - roll_PID - yaw_PID; //Front Right
-  m3_command_scaled = thro_des + pitch_PID - roll_PID + yaw_PID; //Back Right
-  m4_command_scaled = thro_des + pitch_PID + roll_PID - yaw_PID; //Back Left
+  m1_command_scaled = thro_des;
+  m2_command_scaled = 0;
+  m3_command_scaled = 0;
+  m4_command_scaled = 0;
   m5_command_scaled = 0;
   m6_command_scaled = 0;
 
   //0.5 is centered servo, 0.0 is zero throttle if connecting to ESC for conventional PWM, 1.0 is max throttle
-  s1_command_scaled = 0;
-  s2_command_scaled = 0;
-  s3_command_scaled = 0;
-  s4_command_scaled = 0;
-  s5_command_scaled = 0;
-  s6_command_scaled = 0;
-  s7_command_scaled = 0;
+  s1_command_scaled = RUDDER1 + 3*roll_PID + .5*yaw_PID;//RUDDER1
+  s2_command_scaled = RUDDER2 - 3*roll_PID + .5*yaw_PID;//RUDDER2
+  s3_command_scaled = ELEVATOR1 + 3*pitch_PID + .5*yaw_PID;//ELEVATOR2
+  s4_command_scaled = ELEVATOR2 - 3*pitch_PID + .5*yaw_PID;//ELEVATOR2
+  s5_command_scaled = AILERON1 + yaw_PID;//AILERON1 PORT
+  s6_command_scaled = AILERON2 + yaw_PID;//AILERON2 STBD
+  s7_command_scaled = CAMERA1 + pitch_PID;////CAMERA1 Tilt
 
 }
 
 void armedStatus() {
   //DESCRIPTION: Check if the throttle cut is off and the throttle input is low to prepare for flight.
-  if ((channel_5_pwm < 1500) && (channel_1_pwm < 1050)) {
+  if ((channel_5_pwm > 1500) && (channel_1_pwm < 1050)) {
     armedFly = true;
   }
 }
@@ -1178,9 +1185,11 @@ void getCommands() {
   {
     //sBus scaling below is for Taranis-Plus and X4R-SB
     float scale = 0.615;
-    float bias  = 895.0;
-    channel_1_pwm = sbusChannels[0] * scale + bias;
-    channel_2_pwm = sbusChannels[1] * scale + bias;
+    float bias  = 800.0;
+
+    // RadioLink AT10 Stick mode 1
+    channel_1_pwm = sbusChannels[1] * scale + bias;
+    channel_2_pwm = sbusChannels[0] * scale + bias;
     channel_3_pwm = sbusChannels[2] * scale + bias;
     channel_4_pwm = sbusChannels[3] * scale + bias;
     channel_5_pwm = sbusChannels[4] * scale + bias;
@@ -1455,7 +1464,7 @@ void throttleCut() {
       channel_5_pwm is LOW then throttle cut is OFF and throttle value can change. (ThrottleCut is DEACTIVATED)
       channel_5_pwm is HIGH then throttle cut is ON and throttle value = 120 only. (ThrottleCut is ACTIVATED), (drone is DISARMED)
   */
-  if ((channel_5_pwm > 1500) || (armedFly == false)) {
+  if ((channel_5_pwm < 1500) || (armedFly == false)) {
     armedFly = false;
     m1_command_PWM = 120;
     m2_command_PWM = 120;
