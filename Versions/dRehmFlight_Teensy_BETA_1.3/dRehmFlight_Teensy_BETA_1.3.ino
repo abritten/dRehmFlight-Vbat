@@ -3,7 +3,7 @@
 //Editor: Drew Britten
 //Project: Vbat build
 //Project Start: 01/01/2024
-//Last Updated: 01/14/2024
+//Last Updated: 01/17/2024
 //Version: Beta 1.3
 
 //========================================================================================================================//
@@ -487,10 +487,10 @@ void controlMixer() {
   m6_command_scaled = 0;
 
   //0.5 is centered servo, 0.0 is zero throttle if connecting to ESC for conventional PWM, 1.0 is max throttle
-  s1_command_scaled = RUDDER1 + 3*roll_PID + .5*yaw_PID;//RUDDER1
-  s2_command_scaled = RUDDER2 - 3*roll_PID + .5*yaw_PID;//RUDDER2
-  s3_command_scaled = ELEVATOR1 + 3*pitch_PID + .5*yaw_PID;//ELEVATOR2
-  s4_command_scaled = ELEVATOR2 - 3*pitch_PID + .5*yaw_PID;//ELEVATOR2
+  s1_command_scaled = RUDDER1 + 3 * roll_PID + .5 * yaw_PID; //RUDDER1
+  s2_command_scaled = RUDDER2 - 3 * roll_PID + .5 * yaw_PID; //RUDDER2
+  s3_command_scaled = ELEVATOR1 + 3 * pitch_PID + .5 * yaw_PID; //ELEVATOR2
+  s4_command_scaled = ELEVATOR2 - 3 * pitch_PID + .5 * yaw_PID; //ELEVATOR2
   s5_command_scaled = AILERON1 + yaw_PID;//AILERON1 PORT
   s6_command_scaled = AILERON2 + yaw_PID;//AILERON2 STBD
   s7_command_scaled = CAMERA1 + pitch_PID;////CAMERA1 Tilt

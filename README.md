@@ -1,5 +1,18 @@
 ![dRehmFlight Logo](https://github.com/nickrehm/dRehmFlight/blob/master/dRehmFlight%20Logo.png)
 
+## Project : dRehmFlight-Vbat
+
+ This is a RC replica of the [Vbat VTOL model](https://youtu.be/ZL6GpE9IpZY?si=emvoabVcRhbKnvzY), using [DrehmFlight FC](https://github.com/nickrehm/dRehmFlight). Replicated and modified by [abritten](https://github.com/abritten) (Drew Britten).
+
+<img src="resources/images/hover.png" alt="hover" width="700"/>
+<img src="resources/images/flight.png" alt="flight" width="700"/>
+<img src="resources/images/SampleVBAT.jpg" alt="SampleVBAT" width="700"/>
+
+
+---
+
+![dRehmFlight Logo](https://github.com/nickrehm/dRehmFlight/blob/master/dRehmFlight%20Logo.png)
+
 [Intro Video](https://www.youtube.com/watch?v=tlD0C5CrWcA&lc=Ugx6m02xjHk8QH19vd94AaABAg)
 
 [RcGroups Support Thread](https://www.rcgroups.com/forums/showthread.php?3706571-dRehmFlight-VTOL-Teensy-Flight-Controller-and-Stabilization)
