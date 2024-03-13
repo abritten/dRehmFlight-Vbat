@@ -3,7 +3,7 @@
 //Editor: Drew Britten
 //Project: Vbat build
 //Project Start: 01/01/2024
-//Last Updated: 01/17/2024
+//Last Updated: 03/12/2024
 //Version: Beta 1.3
 
 //========================================================================================================================//
@@ -26,8 +26,13 @@
 
   Thank you to:
   Nick Rehm for the help and support on RCGroups VTOL blog to tune this model.
-  Steve Morris for making and sharing public Youtube content on aviation and drone technology prototypes. -Drew
-
+  Steve Morris for making and sharing public Youtube content on aviation and drone technology prototypes.
+  Benjamin Prescher for making and sharing public "Ball Drone" content on Hackaday and Thingiverse.
+  Benjamin Prescher sources:
+  https://hackaday.io/ben5en
+  https://www.thingiverse.com/thing:4635873
+  
+  -Drew
 */
 
 
@@ -70,6 +75,7 @@ static const uint8_t num_DSM_channels = 6; //If using DSM RX, change this to mat
 #include <Wire.h>     //I2c communication
 #include <SPI.h>      //SPI communication
 #include <PWMServo.h> //Commanding any extra actuators, installed with teensyduino installer
+#include <FastLED.h>
 
 #if defined USE_SBUS_RX
 #include "src/SBUS/SBUS.h"   //sBus interface
@@ -176,30 +182,34 @@ float MagScaleZ = 1.0;
 
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 //IMU calibration parameters - calibrate IMU using calculate_IMU_error() in the void setup() to get these values, then comment out calculate_IMU_error()
-float AccErrorX = 0.14;
-float AccErrorY = 0.01;
-float AccErrorZ = -0.07;
-float GyroErrorX = -3.58;
-float GyroErrorY = -0.13;
-float GyroErrorZ = -1.78;
+float AccErrorX = 0.07;
+float AccErrorY = 0.02;
+float AccErrorZ = 0.07;
+float GyroErrorX = -3.03;
+float GyroErrorY = 0.14;
+float GyroErrorZ = 5.22;
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 
 //Controller parameters (take note of defaults before modifying!):
 float i_limit = 25.0;     //Integrator saturation level, mostly for safety (default 25.0)
-float maxRoll = 10.0;     //Max roll angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
-float maxPitch = 10.0;    //Max pitch angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
-float maxYaw = 160.0;     //Max yaw rate in deg/sec
+float HARDMAXROLL = 10.0;
+float HARDMAXPITCH = 10.0;
+float SOFTMAXROLL = 7.0;
+float SOFTMAXPITCH = 7.0;
+float maxRoll = SOFTMAXROLL;     //Max roll angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
+float maxPitch = SOFTMAXPITCH;    //Max pitch angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
+float maxYaw = 320.0;     //Max yaw rate in deg/sec
 
 //ROLL
-float Kp_roll_angle = 0.9;    //Roll P-gain - angle mode
+float Kp_roll_angle = 1.0;    //Roll P-gain - angle mode
 float Ki_roll_angle = 0.3;    //Roll I-gain - angle mode
-float Kd_roll_angle = 0.05;   //Roll D-gain - angle mode (has no effect on controlANGLE2)
+float Kd_roll_angle = 0.2;   //Roll D-gain - angle mode (has no effect on controlANGLE2)
 float B_loop_roll = 0.9;      //Roll damping term for controlANGLE2(), lower is more damping (must be between 0 to 1)
 //PITCH
-float Kp_pitch_angle = 0.9;   //Pitch P-gain - angle mode
+float Kp_pitch_angle = 1.0;   //Pitch P-gain - angle mode
 float Ki_pitch_angle = 0.3;   //Pitch I-gain - angle mode
-float Kd_pitch_angle = 0.05;  //Pitch D-gain - angle mode (has no effect on controlANGLE2)
+float Kd_pitch_angle = 0.2;  //Pitch D-gain - angle mode (has no effect on controlANGLE2)
 float B_loop_pitch = 0.9;     //Pitch damping term for controlANGLE2(), lower is more damping (must be between 0 to 1)
 
 float Kp_roll_rate = 0.15;    //Roll P-gain - rate mode
@@ -209,7 +219,7 @@ float Kp_pitch_rate = 0.15;   //Pitch P-gain - rate mode
 float Ki_pitch_rate = 0.2;    //Pitch I-gain - rate mode
 float Kd_pitch_rate = 0.0002; //Pitch D-gain - rate mode (be careful when increasing too high, motors will begin to overheat!)
 //YAW
-float Kp_yaw = 0.3;           //Yaw P-gain
+float Kp_yaw = 0.1;           //Yaw P-gain
 float Ki_yaw = 0.05;          //Yaw I-gain
 float Kd_yaw = 0.00015;       //Yaw D-gain (be careful when increasing too high, motors will begin to overheat!)
 
@@ -229,6 +239,16 @@ const int ch4Pin = 20; //rudd
 const int ch5Pin = 21; //gear (throttle cut)
 const int ch6Pin = 22; //aux1 (free aux channel)
 const int PPM_Pin = 23;
+
+//LEDS
+#define NUM_LEDS 8
+const int LED_RED = 14; //PORT LED STRIP
+const int LED_GREEN = 15; //STBD LED STRIP
+const int LED_WHITE = 16; //STERN LED STRIP
+CRGB ledsRED[NUM_LEDS];
+CRGB ledsGREEN[NUM_LEDS];
+CRGB ledsWHITE[NUM_LEDS];
+
 //OneShot125 ESC pin outputs:
 const int m1Pin = 0;//main motor
 const int m2Pin = 1;
@@ -237,13 +257,13 @@ const int m4Pin = 3;
 const int m5Pin = 4;
 const int m6Pin = 5;
 //PWM servo or ESC outputs:
-const int servo1Pin = 6;//RUDDER1
-const int servo2Pin = 7;//RUDDER2
-const int servo3Pin = 8;//ELEVATOR1
-const int servo4Pin = 9;//ELEVATOR2
-const int servo5Pin = 10;//AILERON1 PORT
-const int servo6Pin = 11;//AILERON2 STBD
-const int servo7Pin = 12;//CAMERA1 Tilt
+const int servo1Pin = 8;//white//RUDDER1//green
+const int servo2Pin = 7;//yellow//RUDDER2//yellow
+const int servo3Pin = 6;//green//ELEVATOR1//white
+const int servo4Pin = 9;//blue//ELEVATOR2//blue
+const int servo5Pin = 10;//EMPTY
+const int servo6Pin = 11;//EMPTY
+const int servo7Pin = 12;//EMPTY
 PWMServo servo1;  //Create servo objects to control a servo or ESC with PWM
 PWMServo servo2;
 PWMServo servo3;
@@ -316,11 +336,6 @@ float RUDDER1 = 0.5;
 float RUDDER2 = 0.5;
 float ELEVATOR1 = 0.5;
 float ELEVATOR2 = 0.5;
-float AILERON1 = 0.5;
-float AILERON2 = 0.5;
-float CAMERA1 = 0.5;
-
-
 
 //Flight status
 bool armedFly = false;
@@ -351,6 +366,21 @@ void setup() {
 
   //Set built in LED to turn on to signal startup
   digitalWrite(13, HIGH);
+
+  // LED strips are optional. WS2812B sample below:
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, 150);
+  FastLED.addLeds<WS2812B, LED_RED, GRB>(ledsRED, NUM_LEDS);//PORT LED STRIP
+  FastLED.addLeds<WS2812B, LED_GREEN, GRB>(ledsGREEN, NUM_LEDS);//STBD LED STRIP
+  FastLED.addLeds<WS2812B, LED_WHITE, GRB>(ledsWHITE, NUM_LEDS);//STERN LED STRIP
+  FastLED.clear();
+  FastLED.show();
+  for (int i = 0; i < NUM_LEDS; i = i + 1) {
+    ledsRED[i] = CRGB::Red;//PORT LED STRIP
+    ledsGREEN[i] = CRGB::Green;//STBD LED STRIP
+    ledsWHITE[i] = CRGB::White;//STERN LED STRIP
+    FastLED.show();
+    delay(100);
+  }
 
   delay(5);
 
@@ -383,7 +413,10 @@ void setup() {
   servo7.write(90);
 
   delay(5);
-  //delay(500000000);
+  if (0) {
+    Serial.println("Check Servos at set positions");
+    delay(500000000);
+  }
   //calibrateESCs(); //PROPS OFF. Uncomment this to calibrate your ESCs by setting throttle stick to max, powering on, and lowering throttle to zero after the beeps
   //Code will not proceed past here if this function is uncommented!
 
@@ -425,11 +458,13 @@ void loop() {
   //printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   //printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
-  //printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
+  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
   //printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
-  printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
+  //printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
   //printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
 
+
+  harderAngles(); //Assigend to CH6 on radio transmitter. Default roll and pitch angle = 7 degrees. Harder angles = 15 degrees.
   armedStatus(); //Check if the throttle cut is off and throttle is low.
   getIMUdata(); //Pulls raw gyro, accelerometer, and magnetometer data from IMU and LP filters to remove noise
   Madgwick(GyroX, -GyroY, -GyroZ, -AccX, AccY, AccZ, MagY, -MagX, MagZ, dt); //Updates roll_IMU, pitch_IMU, and yaw_IMU angle estimates (degrees)
@@ -477,8 +512,6 @@ void controlMixer() {
     roll_passthru, pitch_passthru, yaw_passthru - direct unstabilized command passthrough
     channel_6_pwm - free auxillary channel, can be used to toggle things with an 'if' statement
   */
-
-  //Quad mixing - EXAMPLE
   m1_command_scaled = thro_des;
   m2_command_scaled = 0;
   m3_command_scaled = 0;
@@ -487,14 +520,13 @@ void controlMixer() {
   m6_command_scaled = 0;
 
   //0.5 is centered servo, 0.0 is zero throttle if connecting to ESC for conventional PWM, 1.0 is max throttle
-  s1_command_scaled = RUDDER1 + 3 * roll_PID + .5 * yaw_PID; //RUDDER1
-  s2_command_scaled = RUDDER2 - 3 * roll_PID + .5 * yaw_PID; //RUDDER2
-  s3_command_scaled = ELEVATOR1 + 3 * pitch_PID + .5 * yaw_PID; //ELEVATOR2
-  s4_command_scaled = ELEVATOR2 - 3 * pitch_PID + .5 * yaw_PID; //ELEVATOR2
-  s5_command_scaled = AILERON1 + yaw_PID;//AILERON1 PORT
-  s6_command_scaled = AILERON2 + yaw_PID;//AILERON2 STBD
-  s7_command_scaled = CAMERA1 + pitch_PID;////CAMERA1 Tilt
 
+
+  //USB at the STBD "BALL DRONE"
+  s1_command_scaled =  ELEVATOR1 - roll_PID + yaw_PID;//RUDDER1
+  s2_command_scaled = ELEVATOR2 + roll_PID + yaw_PID;//RUDDER2
+  s3_command_scaled = RUDDER1 + pitch_PID + yaw_PID;//ELEVATOR2
+  s4_command_scaled = RUDDER2 - pitch_PID + yaw_PID;//ELEVATOR2
 }
 
 void armedStatus() {
@@ -504,6 +536,16 @@ void armedStatus() {
   }
 }
 
+void harderAngles() {
+  if (channel_6_pwm > 1500) {
+    maxRoll = HARDMAXROLL;
+    maxPitch = HARDMAXPITCH;
+  }
+  else {
+    maxRoll = SOFTMAXROLL;
+    maxPitch = SOFTMAXPITCH;
+  }
+}
 void IMUinit() {
   //DESCRIPTION: Initialize IMU
   /*
@@ -1153,10 +1195,11 @@ void scaleCommands() {
   s6_command_PWM = s6_command_scaled * 180;
   s7_command_PWM = s7_command_scaled * 180;
   //Constrain commands to servos within servo library bounds
-  s1_command_PWM = constrain(s1_command_PWM, 0, 180);
-  s2_command_PWM = constrain(s2_command_PWM, 0, 180);
-  s3_command_PWM = constrain(s3_command_PWM, 0, 180);
-  s4_command_PWM = constrain(s4_command_PWM, 0, 180);
+  //SERVO LIMITS
+  s1_command_PWM = constrain(s1_command_PWM, 45, 135);
+  s2_command_PWM = constrain(s2_command_PWM, 45, 135);
+  s3_command_PWM = constrain(s3_command_PWM, 45, 135);
+  s4_command_PWM = constrain(s4_command_PWM, 45, 135);
   s5_command_PWM = constrain(s5_command_PWM, 0, 180);
   s6_command_PWM = constrain(s6_command_PWM, 0, 180);
   s7_command_PWM = constrain(s7_command_PWM, 0, 180);
